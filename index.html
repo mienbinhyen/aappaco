@@ -118,23 +118,31 @@
     </main>
 
     <script>
-        // Tích hợp trực tiếp API Key
         const apiKey = "AIzaSyCfPX92bVcGTkY9Xn7tAS2UA63x7mKLNAw";
-        
         const VOICES = ['Charon', 'Kore', 'Zephyr', 'Aoede', 'Puck', 'Fenrir', 'Enceladus'];
+        
         let state = {
             activeTab: 'single',
             history: [],
             multiSpeakers: [{ name: 'Paco', voice: 'Charon', text: '' }]
         };
 
-        const textInput = document.getElementById('textInput');
         let currentAudio = null;
 
         function init() {
             renderVoiceOptions();
             renderMultiSpeakers();
             lucide.createIcons();
+            
+            // Thanh trượt Volume & Speed
+            document.getElementById('volume').oninput = (e) => {
+                document.getElementById('volVal').innerText = e.target.value + '%';
+                if(currentAudio) currentAudio.volume = e.target.value / 100;
+            };
+            document.getElementById('speed').oninput = (e) => {
+                document.getElementById('speedVal').innerText = e.target.value + 'x';
+                if(currentAudio) currentAudio.playbackRate = parseFloat(e.target.value);
+            };
         }
 
         function renderVoiceOptions() {
@@ -145,15 +153,15 @@
         function renderMultiSpeakers() {
             const container = document.getElementById('multiContainer');
             container.innerHTML = state.multiSpeakers.map((s, i) => `
-                <div class="bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100 space-y-4">
-                    <div class="flex gap-4">
-                        <input oninput="state.multiSpeakers[${i}].name=this.value" value="${s.name}" class="p-2 rounded-xl text-xs font-bold w-1/3 outline-none" placeholder="Tên">
-                        <select onchange="state.multiSpeakers[${i}].voice=this.value" class="p-2 rounded-xl text-xs font-bold outline-none">
+                <div class="bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100 space-y-4 relative">
+                    <div class="flex gap-4 items-center">
+                        <input oninput="state.multiSpeakers[${i}].name=this.value" value="${s.name}" class="p-2 rounded-xl text-xs font-bold w-1/3 outline-none border border-slate-200" placeholder="Tên nhân vật">
+                        <select onchange="state.multiSpeakers[${i}].voice=this.value" class="p-2 rounded-xl text-xs font-bold outline-none border border-slate-200">
                             ${VOICES.map(v => `<option value="${v}" ${s.voice===v?'selected':''}>${v}</option>`).join('')}
                         </select>
-                        <button onclick="removeSpeaker(${i})" class="ml-auto text-red-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        <button onclick="removeSpeaker(${i})" class="ml-auto text-red-400 hover:text-red-600"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
                     </div>
-                    <textarea oninput="state.multiSpeakers[${i}].text=this.value" class="w-full h-24 p-4 rounded-xl text-lg outline-none">${s.text}</textarea>
+                    <textarea oninput="state.multiSpeakers[${i}].text=this.value" class="w-full h-24 p-4 rounded-xl text-lg outline-none border-2 border-transparent focus:border-indigo-100 transition-all">${s.text}</textarea>
                 </div>
             `).join('');
             lucide.createIcons();
@@ -187,12 +195,15 @@
 
         async function handleSpeak() {
             const btn = document.getElementById('speakBtn');
+            const textInput = document.getElementById('textInput');
+            
             btn.disabled = true;
             btn.innerHTML = "ĐANG XỬ LÝ...";
 
             try {
                 let payload;
                 if (state.activeTab === 'single') {
+                    if(!textInput.value.trim()) throw new Error("Vui lòng nhập văn bản!");
                     payload = {
                         contents: [{ parts: [{ text: textInput.value }] }],
                         generationConfig: {
@@ -201,7 +212,8 @@
                         }
                     };
                 } else {
-                    const lines = state.multiSpeakers.map(s => `${s.name}: ${s.text}`).join("\n");
+                    const lines = state.multiSpeakers.filter(s => s.text.trim()).map(s => `${s.name}: ${s.text}`).join("\n");
+                    if(!lines) throw new Error("Vui lòng nhập nội dung hội thoại!");
                     const configs = state.multiSpeakers.map(s => ({ speaker: s.name, voiceConfig: { prebuiltVoiceConfig: { voiceName: s.voice } } }));
                     payload = {
                         contents: [{ parts: [{ text: lines }] }],
@@ -212,21 +224,24 @@
                     };
                 }
 
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                const data = await res.json();
-                const audioBase64 = data.candidates[0].content.parts.find(p => p.inlineData)?.inlineData.data;
 
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message);
+
+                const audioBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
                 if (audioBase64) {
                     const pcm = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0));
                     const wav = pcmToWav(pcm, 24000);
                     playAudio(wav);
                     addToHistory(wav, state.activeTab === 'single' ? textInput.value : "Hội thoại đa giọng");
                 }
-            } catch (e) { alert("Lỗi kết nối!"); }
+            } catch (e) { alert("Lỗi: " + e.message); }
+            
             btn.disabled = false;
             btn.innerHTML = `<i data-lucide="play" fill="white" class="w-8 h-8"></i> ĐỌC BÀI VIẾT`;
             lucide.createIcons();
@@ -243,11 +258,11 @@
         }
 
         function addToHistory(blob, text) {
-            const item = { id: Date.now(), blob, text: text.substring(0, 30) + '...' };
+            const item = { id: Date.now(), blob, text: text.substring(0, 30) + (text.length > 30 ? '...' : '') };
             state.history.unshift(item);
             const list = document.getElementById('historyList');
             list.innerHTML = state.history.map(h => `
-                <div class="p-4 bg-slate-50 rounded-xl flex justify-between items-center text-xs font-bold">
+                <div class="p-4 bg-slate-50 rounded-xl flex justify-between items-center text-xs font-bold border border-slate-100">
                     <span class="truncate w-32">${h.text}</span>
                     <button onclick="downloadBlob(${h.id})" class="text-sky-600"><i data-lucide="download" class="w-4 h-4"></i></button>
                 </div>
@@ -257,41 +272,57 @@
 
         window.downloadBlob = (id) => {
             const h = state.history.find(x => x.id === id);
-            const a = document.createElement('a'); a.href = URL.createObjectURL(h.blob); a.download = 'audio.wav'; a.click();
+            const a = document.createElement('a'); a.href = URL.createObjectURL(h.blob); a.download = `paco_audio_${id}.wav`; a.click();
         };
+
+        // Chuyển Tab
+        document.getElementById('tabSingle').onclick = () => {
+            state.activeTab = 'single';
+            document.getElementById('singleView').classList.remove('hidden');
+            document.getElementById('multiView').classList.add('hidden');
+            document.getElementById('tabSingle').className = "flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all bg-white shadow-md text-sky-700";
+            document.getElementById('tabMulti').className = "flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all text-slate-500";
+        };
+        document.getElementById('tabMulti').onclick = () => {
+            state.activeTab = 'multi';
+            document.getElementById('singleView').classList.add('hidden');
+            document.getElementById('multiView').classList.remove('hidden');
+            document.getElementById('tabMulti').className = "flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all bg-white shadow-md text-sky-700";
+            document.getElementById('tabSingle').className = "flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all text-slate-500";
+        };
+
+        // AI Assistant
+        document.getElementById('openAiBtn').onclick = () => document.getElementById('aiModal').classList.remove('hidden');
+        document.getElementById('closeAiBtn').onclick = () => document.getElementById('aiModal').classList.add('hidden');
 
         document.getElementById('sendAiBtn').onclick = async () => {
             const prompt = document.getElementById('aiPrompt').value;
             if(!prompt) return;
-
             const history = document.getElementById('chatHistory');
-            history.innerHTML += `<div class="p-4 bg-slate-100 rounded-2xl ml-auto max-w-[80%] text-sm mb-4">${prompt}</div>`;
+            history.innerHTML += `<div class="p-4 bg-slate-100 rounded-2xl ml-auto max-w-[80%] text-sm mb-4 font-medium">${prompt}</div>`;
             document.getElementById('aiPrompt').value = '';
-
+            
             try {
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "Hãy viết một bài viết ngắn theo yêu cầu sau: " + prompt }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "Hãy viết bài văn ngắn: " + prompt }] }] })
                 });
                 const data = await res.json();
                 const text = data.candidates[0].content.parts[0].text;
-                history.innerHTML += `<div class="p-4 bg-indigo-50 rounded-2xl mr-auto max-w-[90%] text-sm mb-4 border border-indigo-100">
+                history.innerHTML += `<div class="p-4 bg-indigo-50 rounded-2xl mr-auto max-w-[90%] text-sm mb-4 border border-indigo-100 shadow-sm">
                     ${text}
-                    <button onclick="applyText(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" class="mt-4 block px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs">Dùng bài viết này</button>
+                    <button onclick="applyText(\`${text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" class="mt-4 block px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold">SỬ DỤNG</button>
                 </div>`;
-            } catch(e) { alert("Lỗi AI!"); }
+                history.scrollTop = history.scrollHeight;
+            } catch (e) { alert("Lỗi kết nối AI!"); }
         };
 
         window.applyText = (text) => {
-            textInput.value = text;
+            document.getElementById('textInput').value = text;
             document.getElementById('aiModal').classList.add('hidden');
         };
 
-        document.getElementById('tabSingle').onclick = () => { state.activeTab='single'; document.getElementById('singleView').classList.remove('hidden'); document.getElementById('multiView').classList.add('hidden'); };
-        document.getElementById('tabMulti').onclick = () => { state.activeTab='multi'; document.getElementById('singleView').classList.add('hidden'); document.getElementById('multiView').classList.remove('hidden'); };
-        document.getElementById('openAiBtn').onclick = () => document.getElementById('aiModal').classList.remove('hidden');
-        document.getElementById('closeAiBtn').onclick = () => document.getElementById('aiModal').classList.add('hidden');
         document.getElementById('speakBtn').onclick = handleSpeak;
         document.getElementById('stopBtn').onclick = () => { if(currentAudio) currentAudio.pause(); document.getElementById('stopBtn').classList.add('hidden'); };
 
