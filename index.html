@@ -134,7 +134,6 @@
             renderMultiSpeakers();
             lucide.createIcons();
             
-            // Thanh trượt Volume & Speed
             document.getElementById('volume').oninput = (e) => {
                 document.getElementById('volVal').innerText = e.target.value + '%';
                 if(currentAudio) currentAudio.volume = e.target.value / 100;
@@ -240,7 +239,10 @@
                     playAudio(wav);
                     addToHistory(wav, state.activeTab === 'single' ? textInput.value : "Hội thoại đa giọng");
                 }
-            } catch (e) { alert("Lỗi: " + e.message); }
+            } catch (e) { 
+                console.error(e);
+                alert("Lỗi: " + e.message); 
+            }
             
             btn.disabled = false;
             btn.innerHTML = `<i data-lucide="play" fill="white" class="w-8 h-8"></i> ĐỌC BÀI VIẾT`;
@@ -275,7 +277,6 @@
             const a = document.createElement('a'); a.href = URL.createObjectURL(h.blob); a.download = `paco_audio_${id}.wav`; a.click();
         };
 
-        // Chuyển Tab
         document.getElementById('tabSingle').onclick = () => {
             state.activeTab = 'single';
             document.getElementById('singleView').classList.remove('hidden');
@@ -283,6 +284,7 @@
             document.getElementById('tabSingle').className = "flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all bg-white shadow-md text-sky-700";
             document.getElementById('tabMulti').className = "flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all text-slate-500";
         };
+
         document.getElementById('tabMulti').onclick = () => {
             state.activeTab = 'multi';
             document.getElementById('singleView').classList.add('hidden');
@@ -291,7 +293,6 @@
             document.getElementById('tabSingle').className = "flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all text-slate-500";
         };
 
-        // AI Assistant
         document.getElementById('openAiBtn').onclick = () => document.getElementById('aiModal').classList.remove('hidden');
         document.getElementById('closeAiBtn').onclick = () => document.getElementById('aiModal').classList.add('hidden');
 
