@@ -1,7 +1,0 @@
-{
-  "name": "Paco Audio - Miền Bình Yên",
-  "description": "An advanced Text-to-Speech application powered by Gemini 2.5 Flash TTS, featuring professional voice styles, emotional modulation, and a serene Vietnamese-inspired interface.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}
