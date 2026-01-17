@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { 
@@ -8,16 +9,46 @@ import {
 import { GoogleGenAI, Modality } from "@google/genai";
 
 // --- AUDIO UTILS ---
-function pcmToWav(pcmData: Int16Array, sampleRate: number): Blob {
+
+// Implementation of manual base64 decoding as per @google/genai guidelines
+function decode(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// Implementation of manual audio decoding as per @google/genai guidelines
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
+function pcmToWav(pcmData: Int16Array, sampleRate: number) {
   const buffer = new ArrayBuffer(44 + pcmData.length * 2);
   const view = new DataView(buffer);
-
   const writeString = (offset: number, string: string) => {
     for (let i = 0; i < string.length; i++) {
       view.setUint8(offset + i, string.charCodeAt(i));
     }
   };
-
   writeString(0, 'RIFF');
   view.setUint32(4, 32 + pcmData.length * 2, true);
   writeString(8, 'WAVE');
@@ -31,11 +62,9 @@ function pcmToWav(pcmData: Int16Array, sampleRate: number): Blob {
   view.setUint16(34, 16, true);
   writeString(36, 'data');
   view.setUint32(40, pcmData.length * 2, true);
-
   for (let i = 0; i < pcmData.length; i++) {
     view.setInt16(44 + i * 2, pcmData[i], true);
   }
-
   return new Blob([buffer], { type: 'audio/wav' });
 }
 
@@ -66,15 +95,17 @@ const App = () => {
     { id: 2, name: 'Mây', voice: 'Zephyr', text: '' },
   ]);
 
+  // Fix: Handle webkitAudioContext TypeScript error by casting to any
   const initAudioContext = () => {
     if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      audioContextRef.current = new AudioContextClass({ sampleRate: 24000 });
     }
   };
 
   const stopAudio = () => {
     if (sourceNodeRef.current) {
-      sourceNodeRef.current.stop();
+      try { sourceNodeRef.current.stop(); } catch(e) {}
       sourceNodeRef.current = null;
     }
     setIsPlaying(false);
@@ -92,8 +123,7 @@ const App = () => {
       setText(response.text || "");
       setAiPrompt('');
     } catch (err) {
-      console.error(err);
-      alert("Lỗi AI Writer. Vui lòng kiểm tra kết nối.");
+      alert("Lỗi AI Writer. Vui lòng kiểm tra API Key.");
     } finally {
       setIsAiWriting(false);
     }
@@ -124,7 +154,13 @@ const App = () => {
           },
         });
       } else {
-        const conversation = speakers.map(s => `${s.name}: ${s.text}`).join('\n');
+        const conversation = speakers.filter(s => s.text.trim()).map(s => `${s.name}: ${s.text}`).join('\n');
+        // Multi-speaker recommendation: use exactly 2 speakers if possible
+        const speakerConfigs = speakers.slice(0, 2).map(s => ({
+          speaker: s.name,
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: s.voice } }
+        }));
+
         response = await ai.models.generateContent({
           model: "gemini-2.5-flash-preview-tts",
           contents: [{ parts: [{ text: `TTS conversation:\n${conversation}` }] }],
@@ -132,10 +168,7 @@ const App = () => {
             responseModalities: [Modality.AUDIO],
             speechConfig: {
               multiSpeakerVoiceConfig: {
-                speakerVoiceConfigs: speakers.map(s => ({
-                  speaker: s.name,
-                  voiceConfig: { prebuiltVoiceConfig: { voiceName: s.voice } }
-                }))
+                speakerVoiceConfigs: speakerConfigs
               }
             }
           }
@@ -143,24 +176,26 @@ const App = () => {
       }
 
       const base64Data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (base64Data) {
-        const binary = atob(base64Data);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      if (base64Data && audioContextRef.current) {
+        // Use manual decoding as per guidelines
+        const bytes = decode(base64Data);
         
+        // For WAV blob generation (download functionality)
         const pcmData = new Int16Array(bytes.buffer);
         const wavBlob = pcmToWav(pcmData, 24000);
         const wavUrl = URL.createObjectURL(wavBlob);
 
-        const audioBuffer = audioContextRef.current!.createBuffer(1, pcmData.length, 24000);
-        const channelData = audioBuffer.getChannelData(0);
-        for (let i = 0; i < pcmData.length; i++) {
-          channelData[i] = pcmData[i] / 32768.0;
-        }
+        // For audio playback
+        const audioBuffer = await decodeAudioData(
+          bytes,
+          audioContextRef.current,
+          24000,
+          1
+        );
 
-        const source = audioContextRef.current!.createBufferSource();
+        const source = audioContextRef.current.createBufferSource();
         source.buffer = audioBuffer;
-        source.connect(audioContextRef.current!.destination);
+        source.connect(audioContextRef.current.destination);
         source.onended = () => setIsPlaying(false);
         source.start();
         sourceNodeRef.current = source;
@@ -172,11 +207,11 @@ const App = () => {
           url: wavUrl,
           type: activeTab
         };
-        setHistory([newEntry, ...history]);
+        setHistory(prev => [newEntry, ...prev]);
       }
     } catch (err) {
       console.error(err);
-      alert("Lỗi tạo giọng nói. Hãy đảm bảo API Key hợp lệ.");
+      alert("Lỗi tạo giọng nói. Hãy kiểm tra API Key.");
     } finally {
       setIsGenerating(false);
     }
@@ -235,7 +270,7 @@ const App = () => {
                 />
               </div>
             ) : (
-              <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2">
                 {speakers.map((s, idx) => (
                   <div key={s.id} className="p-6 bg-slate-50/50 rounded-3xl border border-slate-100 space-y-4">
                     <div className="flex gap-4">
@@ -273,12 +308,17 @@ const App = () => {
                     />
                   </div>
                 ))}
-                <button 
-                  onClick={() => setSpeakers([...speakers, { id: Date.now(), name: 'Người mới', voice: 'Charon', text: '' }])}
-                  className="w-full py-4 border-2 border-dashed border-slate-200 rounded-3xl text-slate-300 font-bold text-xs uppercase hover:border-slate-400 transition-all"
-                >
-                  + Thêm người nói
-                </button>
+                {speakers.length < 2 && (
+                  <button 
+                    onClick={() => setSpeakers([...speakers, { id: Date.now(), name: 'Người mới', voice: 'Charon', text: '' }])}
+                    className="w-full py-4 border-2 border-dashed border-slate-200 rounded-3xl text-slate-300 font-bold text-xs uppercase hover:border-slate-400 transition-all"
+                  >
+                    + Thêm người nói
+                  </button>
+                )}
+                {speakers.length >= 2 && activeTab === 'multi' && (
+                  <p className="text-[10px] text-center text-slate-400 uppercase font-bold tracking-widest">Giới hạn 2 người nói cho chế độ đa giọng</p>
+                )}
               </div>
             )}
 
@@ -288,7 +328,7 @@ const App = () => {
                 disabled={isGenerating}
                 className="flex-1 py-5 bg-black text-white rounded-3xl font-black text-xl shadow-2xl hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
               >
-                {isGenerating ? "ĐANG TẠO ÂM THANH..." : isPlaying ? "ĐANG PHÁT..." : <><Volume2 size={24} /> BẮT ĐẦU ĐỌC</>}
+                {isGenerating ? "ĐANG TẠO..." : isPlaying ? "ĐANG PHÁT..." : <><Volume2 size={24} /> BẮT ĐẦU ĐỌC</>}
               </button>
               {isPlaying && (
                 <button onClick={stopAudio} className="p-5 bg-red-50 text-red-600 rounded-3xl hover:bg-red-100 transition-all">
@@ -340,7 +380,7 @@ const App = () => {
                     <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400">
                       {item.type === 'single' ? <User size={14}/> : <Users size={14}/>}
                     </div>
-                    <p className="text-sm font-bold text-slate-600 truncate w-32">{item.title || "Không có tên"}</p>
+                    <p className="text-sm font-bold text-slate-600 truncate w-32">{item.title || "Bản thu"}</p>
                   </div>
                   <a href={item.url} download={`paco-audio-${item.id}.wav`} className="p-2 text-slate-300 hover:text-black transition-colors">
                     <Download size={16} />
@@ -353,7 +393,7 @@ const App = () => {
       </div>
 
       <footer className="mt-20 py-8 border-t text-center">
-        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.5em]">Paco Studio • Premium Audio Experience • 2024</p>
+        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.5em]">Paco Studio • 2024</p>
       </footer>
     </div>
   );
