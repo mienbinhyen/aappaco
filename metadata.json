@@ -1,7 +1,0 @@
-{
-  "name": "Paco Audio - Miền Bình Yên",
-  "description": "Chuyển đổi văn bản thành giọng nói cảm xúc với phong cách tối giản.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}
