@@ -58,19 +58,14 @@
 <body class="studio-gradient min-h-screen">
     <div id="error-display">
         <h1 class="text-2xl font-bold text-red-600 mb-2">Đã xảy ra lỗi khởi tạo</h1>
-        <p id="error-message" class="text-slate-500 mb-4"></p>
-        <button onclick="location.reload()" class="px-4 py-2 bg-black text-white rounded-lg">Thử lại</button>
+        <p id="error-message" class="text-slate-500 mb-4 font-mono text-sm"></p>
+        <button onclick="location.reload()" class="px-6 py-2 bg-black text-white rounded-xl font-bold">Thử lại</button>
     </div>
 
     <div id="root"></div>
 
-    <script>
-        window.onerror = function(message, source, lineno, colno, error) {
-            document.getElementById('error-display').style.display = 'flex';
-            document.getElementById('error-message').textContent = message;
-        };
+    <script type="text/babel" data-type="module">
+        import './index.tsx';
     </script>
-
-    <script type="text/babel" data-type="module" src="./index.tsx"></script>
 </body>
 </html>
