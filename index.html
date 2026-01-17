@@ -3,39 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paco Audio Studio</title>
+    <title>Paco Audio - Miền Bình Yên</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap');
+        
         body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: #fafafa;
-            color: #111;
+            font-family: 'Quicksand', sans-serif;
+            background-color: #f0fdf4;
             margin: 0;
+            padding: 0;
+            color: #1e293b;
         }
-        .studio-gradient {
-            background: radial-gradient(circle at top right, #f0f4ff, transparent),
-                        radial-gradient(circle at bottom left, #fff1f1, transparent);
+
+        .peace-bg {
+            background: radial-gradient(circle at top right, #f0fdf4, #ffffff);
+            min-height: 100vh;
         }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(0, 0, 0, 0.05);
+
+        .zen-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.04);
+            border-radius: 2.5rem;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #dcfce7;
+            border-radius: 10px;
+        }
+        
+        .tab-active {
+            background: #10b981;
+            color: white;
+            box-shadow: 0 4px 15px -3px rgba(16, 185, 129, 0.3);
+        }
+
+        @keyframes soft-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.02); opacity: 0.8; }
+        }
+        .generating-status {
+            animation: soft-pulse 2s infinite ease-in-out;
         }
     </style>
-<script type="importmap">
+    <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.446.0",
+    "@google/genai": "https://esm.sh/@google/genai@0.2.1",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.37.0"
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
 </head>
-<body class="studio-gradient min-h-screen">
+<body class="peace-bg">
     <div id="root"></div>
+    <script type="module" src="index.tsx"></script>
 </body>
 </html>
