@@ -3,48 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paco Audio - Miền Bình Yên</title>
+    <title>Paco Audio Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <style>
-        @font-face {
-            font-family: 'Times New Roman';
-            src: local('Times New Roman');
-        }
-        * {
-            font-family: 'Times New Roman', Times, serif !important;
-        }
-        body { background-color: #fcfcfc; color: #1e293b; overflow-x: hidden; }
-        .peaceful-gradient { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); }
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;900&display=swap');
         
-        /* Animation cho nút Play */
-        @keyframes pulse-slow {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.05); opacity: 0.8; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #fafafa;
+            color: #111;
+            margin: 0;
         }
-        .animate-pulse-slow { animation: pulse-slow 3s infinite ease-in-out; }
+
+        .studio-gradient {
+            background: radial-gradient(circle at top right, #f0f4ff, transparent),
+                        radial-gradient(circle at bottom left, #fff1f1, transparent);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        #error-display {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: white;
+            z-index: 9999;
+            padding: 2rem;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
     </style>
 
     <script type="importmap">
 {
   "imports": {
-    "lucide-react": "https://esm.sh/lucide-react@^0.462.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0-rc.0/client",
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.446.0",
     "@google/genai": "https://esm.sh/@google/genai@0.2.1",
-    "react": "https://esm.sh/react@19.0.0-rc.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
 </head>
-<body>
+<body class="studio-gradient min-h-screen">
+    <div id="error-display">
+        <h1 class="text-2xl font-bold text-red-600 mb-2">Đã xảy ra lỗi khởi tạo</h1>
+        <p id="error-message" class="text-slate-500 mb-4"></p>
+        <button onclick="location.reload()" class="px-4 py-2 bg-black text-white rounded-lg">Thử lại</button>
+    </div>
+
     <div id="root"></div>
+
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            document.getElementById('error-display').style.display = 'flex';
+            document.getElementById('error-message').textContent = message;
+        };
+    </script>
+
     <script type="text/babel" data-type="module" src="./index.tsx"></script>
 </body>
 </html>
